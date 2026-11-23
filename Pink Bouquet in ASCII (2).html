@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pink Bouquet in ASCII</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#fbeff3;--fg:#4a1f35;--mut:#94607a;--card:#150711;--btn:#fff;--bd:#e6bfd0;--acc:#c93a77}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#140912;--fg:#fbe3ec;--mut:#c99bb2;--card:#150711;--btn:#2a1223;--bd:#4a2438;--acc:#ff80b3}}
+:root[data-theme="dark"]{--bg:#140912;--fg:#fbe3ec;--mut:#c99bb2;--card:#150711;--btn:#2a1223;--bd:#4a2438;--acc:#ff80b3}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Georgia,"Times New Roman",serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px}
+h1{font-weight:400;font-size:clamp(24px,5vw,34px);margin:4px 0 2px;letter-spacing:.01em}
+p.sub{margin:0 0 14px;color:var(--mut);font-size:15px;font-style:italic}
+#stage{touch-action:none;cursor:grab;width:100%;max-width:1280px;background:radial-gradient(ellipse at 50% 40%,#2c0f22 0%,var(--card) 70%);border-radius:18px;padding:4px;overflow:hidden}
+#art{display:block;width:max-content;margin:0 auto;font-family:"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;line-height:1.2;white-space:pre;color:#f7d6e3}
+.hint{margin:14px 0 0;font-size:13px;color:var(--mut);opacity:.4;letter-spacing:.03em;user-select:none}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin-top:14px}
+button{font:inherit;font-size:15px;color:var(--fg);background:var(--btn);border:1px solid var(--bd);border-radius:999px;padding:8px 16px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+label{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:15px}
+input[type=range]{accent-color:var(--acc);width:160px}
+</style></head><body>
+
+
+<div id="stage"><pre id="art" aria-label="Animated ASCII bouquet of pink peonies, lilies and blossoms"></pre></div>
+<p class="hint">drag to turn</p>
+<script>
+const W=116,H=76,S=4.4,PD=46,CX=W/2,CY=38,NL=12,{sin,cos,abs,PI}=Math;
+const zb=new Float32Array(W*H),chs=new Array(W*H),cols=new Uint8Array(W*H),RAMP=".,:;-=+x*#%@";
+const TYP=[[336,78,16,86,-10],[328,85,12,76,-10],[346,72,20,92,-8],[326,88,14,70,-10],[350,68,22,94,-8],[44,95,25,80,-6],[138,50,10,62,14],[130,42,10,48,12],[28,46,14,88,-8],[322,78,14,72,-8],[340,45,40,96,-6]];
+const pal=TYP.map(([h,s,a,b,sh])=>Array.from({length:NL},(_,l)=>{const u=l/(NL-1);return`hsl(${h+sh*(1-u)} ${s*(1-.5*Math.max(0,(u-.8)/.2))}% ${a+(b-a)*Math.pow(u,.85)}%)`}));
+const nrm=v=>{const m=Math.hypot(...v);return v.map(x=>x/m)};
+let K=nrm([-.45,.6,.65]),HV=nrm([K[0],K[1],K[2]+1]);const F=nrm([.75,.1,.45]);
+const lv=b=>Math.max(0,Math.min(NL-1,Math.floor(b*NL)));
+// key light + fill + translucency (light through thin petals) + rim + glossy highlight
+function shade(nx,ny,nz,ao,tr,sg){const m=Math.hypot(nx,ny,nz)||1;nx/=m;ny/=m;nz/=m;if(nz<0){nx=-nx;ny=-ny;nz=-nz}
+ const dk=nx*K[0]+ny*K[1]+nz*K[2],df=nx*F[0]+ny*F[1]+nz*F[2],dh=nx*HV[0]+ny*HV[1]+nz*HV[2];
+ return(.12+.72*Math.max(0,dk)+.2*Math.max(0,df)+.1*Math.max(0,ny)+tr*.3*Math.max(0,-dk)+.3*Math.pow(1-nz,3))*ao+sg*Math.pow(Math.max(0,dh),26)}
+let M=new Float64Array(9),T=[0,0,0],X,Y,Z,NX,NY,NZ;
+function mul(a,b){const r=new Float64Array(9);for(let i=0;i<3;i++)for(let j=0;j<3;j++)r[i*3+j]=a[i*3]*b[j]+a[i*3+1]*b[3+j]+a[i*3+2]*b[6+j];return r}
+function setCam(A,sw,pt){const cA=cos(A),sA=sin(A),cs=cos(sw),ss=sin(sw),cp=cos(pt),sp=sin(pt);
+ M=mul([1,0,0,0,cp,-sp,0,sp,cp],mul([cs,-ss,0,ss,cs,0,0,0,1],[cA,0,sA,0,1,0,-sA,0,cA]));T=[-15*ss,cp*15*(cs-1),sp*15*(cs-1)]}
+function tf(x,y,z){X=M[0]*x+M[1]*y+M[2]*z+T[0];Y=M[3]*x+M[4]*y+M[5]*z+T[1];Z=M[6]*x+M[7]*y+M[8]*z+T[2]}
+function cn(x,y,z){NX=M[0]*x+M[1]*y+M[2]*z;NY=M[3]*x+M[4]*y+M[5]*z;NZ=M[6]*x+M[7]*y+M[8]*z}
+function plot(x,y,z,ch,c){const f=PD/(PD-z),q=Math.round(CX+x*S*f),r=Math.round(CY-(y+3)*S*.5*f);if(q<0||q>=W||r<0||r>=H)return;const i=r*W+q;if(z>zb[i]){zb[i]=z;chs[i]=ch;cols[i]=c}}
+function orient(d,tw){const ax=d[2],az=-d[0],s=Math.hypot(ax,az),c=d[1];let R=[1,0,0,0,1,0,0,0,1];
+ if(s>1e-5){const kx=ax/s,kz=az/s,t=1-c;R=[c+t*kx*kx,-s*kz,t*kx*kz,s*kz,c,-s*kx,t*kx*kz,s*kx,c+t*kz*kz]}
+ return mul(R,[cos(tw),0,sin(tw),0,1,0,-sin(tw),0,cos(tw)])}
+function lp(C,o,x,y,z,ch,c){plot(C[0]*x+C[1]*y+C[2]*z+o[0],C[3]*x+C[4]*y+C[5]*z+o[1],C[6]*x+C[7]*y+C[8]*z+o[2]+.3,ch,c)}
+function petal(C,o,phi,Ln,Wd,th,cu,shape,fx,ao0,tr,sg){
+ const nt=Math.max(10,Math.ceil(Ln*11)),ns=Math.max(9,Math.ceil(Wd*15)),cp=cos(phi),sq=sin(phi);
+ const vx=-C[0]*sq+C[2]*cp,vy=-C[3]*sq+C[5]*cp,vz=-C[6]*sq+C[8]*cp;
+ for(let i=0;i<=nt;i++){const t=i/nt,a=th-cu*t,ca=cos(a),sa=sin(a),r=.25+Ln*t*ca,h=Ln*t*sa,w=Wd*shape(t);
+  const nx=-sa*cp,ny=ca,nz=-sa*sq,bx=C[0]*nx+C[1]*ny+C[2]*nz,by=C[3]*nx+C[4]*ny+C[5]*nz,bz=C[6]*nx+C[7]*ny+C[8]*nz;
+  const aot=ao0*(.55+.45*Math.min(1,t*2.2));
+  for(let j=0;j<=ns;j++){const s=-1+2*j/ns,t0=fx(t,s);if(t0<0)continue;const type=(bz-.6*s*vz<0&&t0<2)?2:t0;
+   const sd=s*w,ly=h+s*s*w*.3+w*.1*t*abs(s)*sin(7*s+3*phi),lx=cp*r-sq*sd,lz=sq*r+cp*sd;
+   const l=lv(shade(bx-.6*s*vx,by-.6*s*vy,bz-.6*s*vz,aot*(.94+.06*cos(s*10)),tr,sg));
+   plot(C[0]*lx+C[1]*ly+C[2]*lz+o[0],C[3]*lx+C[4]*ly+C[5]*lz+o[1],C[6]*lx+C[7]*ly+C[8]*lz+o[2],RAMP[l],type*NL+l)}}}
+const pS=t=>Math.pow(sin(PI*Math.pow(t,1.3)),.6),lS=t=>sin(PI*Math.pow(t,.8))*(1-.3*t),bS=t=>Math.pow(sin(PI*Math.pow(t,1.2)),.5);
+function stam(C,o,f,b,sp,ht){const sc=Math.max(0,Math.min(1,(b-.45)*2));if(!sc)return;
+ for(const[a,r,h]of f.st)lp(C,o,cos(a)*r*sp*sc,ht*(.6+.4*h),sin(a)*r*sp*sc,'*.o'[Math.floor(h*3)],5*NL+5+Math.floor(h*6))}
+function peony(C,o,f,b){const cfg=[[9,1,.58],[8,.9,.56],[7,.78,.52],[6,.64,.48],[5,.48,.42]],TT=[[0,2],[1,0],[1,0],[1,0],[1,1]];
+ for(let k=0;k<5;k++){const[n,lf,wf]=cfg[k],th=(1.25+k*.08)*(1-b)+(.12+k*.24)*b,cu=.1*(1-b)+(.75-.13*k)*b;
+  for(let q=0;q<n;q++)petal(C,o,q*2*PI/n+k*.55,f.s*lf,f.s*wf*(.55+.45*b),th,cu,pS,t=>t<.28?TT[k][0]:TT[k][1],1-.09*k,.5,.3)}
+ stam(C,o,f,b,.28*f.s,.2*f.s)}
+function lily(C,o,f,b){const th=1.5*(1-b)+.55*b,cu=.1*(1-b)+1.25*b;
+ for(let q=0;q<6;q++){const inn=q%2;
+  petal(C,o,q*PI/3,f.s*(inn?1.12:1.2),f.s*.4*(.5+.5*b)*(inn?1.15:1),th+(inn?.12:0),cu,lS,(t,s)=>((abs(s)<.12&&t<.75&&b>.3)||(b>.4&&t>.12&&t<.7&&(Math.floor(t*10)*7+Math.floor((s+1)*3.2)*5+q)%6==0))?3:2,1,.6,.5)}
+ const sc=Math.max(0,Math.min(1,(b-.35)*1.6));
+ if(sc)for(let i=0;i<6;i++){const a=i*PI/3+.5;for(let j=0;j<=14;j++){const u=j/14,rr=(.05+.55*u)*f.s*.8*sc;lp(C,o,cos(a)*rr,f.s*(.12+.5*u)*sc,sin(a)*rr,j==14?'@':'|',5*NL+(j==14?10:6))}}}
+function blossom(C,o,f,b){const th=1.3*(1-b)+.32*b,cu=.05+.4*b;
+ for(let q=0;q<5;q++)petal(C,o,q*2*PI/5+.3,f.s,f.s*.62*(.55+.45*b),th,cu,bS,(t,s)=>t>.9&&abs(s)<.3?-1:(t<.25&&b>.25?1:4),1,.7,.3);
+ stam(C,o,f,b,.22*f.s,.18*f.s)}
+function stem(h,e,c,l){let px=null,py,ch='|';
+ for(let i=0;i<=85;i++){const u=i/85,a=(1-u)*(1-u),b=2*u*(1-u),d=u*u;
+  tf(a*h[0]+b*c[0]+d*e[0],a*h[1]+b*c[1]+d*e[1],a*h[2]+b*c[2]+d*e[2]);
+  if(px!==null){const dx=(X-px)*S,dy=(Y-py)*S*.5;ch=abs(dy)>2*abs(dx)?'|':abs(dx)>2*abs(dy)?'_':(dx*dy>0?'/':'\\')}
+  plot(X,Y,Z-.15,ch,7*NL+l+Math.floor((1-u)*3));px=X;py=Y}}
+const FL=[['p',0,3.4,0,3.5,0],['p',-5.6,.6,1.2,3.1,.25],['p',5.2,-.2,1.8,3,.4],['p',-.6,-2.6,-4.8,2.7,.55],
+['l',-2.6,-1.4,4.2,3.2,.35],['l',3.2,2,-3.4,3,.6],['l',-3.6,3.6,-2.6,2.7,.8],
+['b',1.6,-2.4,5,2.1,.7],['b',-6.8,-3.2,-.6,2,.5],['b',6.6,-3.6,-1,2,.9],['b',-.3,6.6,-.4,1.8,1],['b',4.6,3.8,2.6,1.9,.15]]
+.map(([k,x,y,z,s,d],i)=>{const v=[x,y+9,z],n=Math.hypot(...v);return{k,p:[x,y,z],sp:[0,0,0],sv:[0,0,0],s,d,d0:v.map(q=>q/n),tw:i*1.37,st:Array.from({length:40},()=>[Math.random()*6.28,Math.sqrt(Math.random()),Math.random()])}});
+const SP=[[-7.5,3,1],[7.2,2.5,-1],[-4.5,6,-1],[5,6,0],[-1.5,8.2,2],[2.5,-.5,6.2],[-8,-1.5,3.5],[.8,4.5,-6],[8,0,3]]
+.map(p=>({p,o:Array.from({length:10},()=>[(Math.random()-.5)*1.3,(Math.random()-.5)*1.1,(Math.random()-.5)*1.3])}));
+const LV=[0,1,2,3,4,5,6].map(i=>({a:i*PI*2/7+.4,L:5.4+(i%3)*.8,W:1.2}));
+const SK=Array.from({length:36},()=>[Math.random()*W|0,Math.random()*H|0,Math.random()*6.28]);
+let DA=0,DP=0,drag=false,cyc=0,A=0,B=0,rot=true,idleOn=true,idle=0,anim=true,tt=0,last=0,lastR=0;
+function leaf(f){const a=f.a+sin(tt*.8+f.a*3)*.06*idle+(wxl*-sin(f.a)+wzl*cos(f.a))*.06,ce=cos(.95),se=sin(.95),D=[cos(a)*ce,se,sin(a)*ce],w=[-sin(a),0,cos(a)];
+ cn(D[1]*w[2],D[2]*w[0]-D[0]*w[2],-D[1]*w[0]);const nx=NX,ny=NY,nz=NZ;cn(w[0],0,w[2]);const wx=NX,wy=NY,wz=NZ;
+ for(let i=0;i<=56;i++){const t=i/56,wd=f.W*sin(PI*Math.pow(t,.8)),k=f.L*t;
+  for(let j=0;j<=17;j++){const s=-1+j/8.5;tf(D[0]*k+w[0]*s*wd,-6.6+D[1]*k-.7*f.L*t*t,D[2]*k+w[2]*s*wd);
+   const vn=(abs(s)<.07||abs((t*9-abs(s)*2.5)%1)<.09)?.14:0;
+   const l=lv(shade(nx+.35*s*wx,ny+.35*s*wy,nz+.35*s*wz,.55+.45*t,.15,.5)+vn);plot(X,Y,Z,RAMP[l],6*NL+l)}}}
+function sprig(f,i){const h=[f.p[0]+idle*.18*sin(tt*1.3+i*2)+wxl*.5-OA*.01*f.p[2],f.p[1]+idle*.12*sin(tt*1.7+i),f.p[2]+wzl*.5+OA*.01*f.p[0]];
+ stem(h,[f.p[0]*.2,-6.4,f.p[2]*.2],[f.p[0]*.7,f.p[1]*.5-2,f.p[2]*.7],1);
+ const sc=Math.max(0,Math.min(1,(B-.5)*2));if(!sc)return;
+ for(const q of f.o){tf(h[0]+q[0]*sc,h[1]+q[1]*sc,h[2]+q[2]*sc);plot(X,Y,Z+.2,'*.o'[(abs(q[2]*9)|0)%3],10*NL+6+(abs(q[0]*7)|0)%6)}}
+function wrap(){for(let i=0;i<=72;i++){const fy=i/72;
+ for(let j=0;j<250;j++){const t0=j*PI/125,wy=fy*fy,th=t0+tw*wy,d1=dsp(t0),top=-6.4+.4*sin(6*t0)-.7*Math.abs(d1)*wy,y=-15+(top+15)*fy,r=.9+(y+15)*.523,c5=cos(5*th),md=.07*sin(5*th)+.025*sin(13*th+3*y)+d1*wy,R=r*(1+md),c=cos(th),s=sin(th);tf(c*R,y,s*R);
+  const dm=.35*c5+.3*cos(13*th+3*y)+ddsp(t0)*wy*.5;cn(c*.89+s*dm,.45,s*.89-c*dm);
+  let br=shade(NX,NY,NZ,NZ>0?1:.45,.1,.2);if((((y+15)*.9+th*1.4)%1)<.12)br*=.8;
+  const l=lv(br);plot(X,Y,Z,RAMP[l],(NZ>0?8:2)*NL+l)}}
+ for(let y=-9.8;y<=-9.1;y+=.07){const r=(.9+(y+15)*.523)*1.08+.1;
+  for(let j=0;j<250;j++){const t0=j*PI/125,wy=Math.pow((y+15)/8.6,2),th=t0+tw*wy,rr=r*(1+dsp(t0)*wy);tf(cos(th)*rr,y,sin(th)*rr);cn(cos(th),0,sin(th));
+   const l=lv(NZ>0?shade(NX,NY,NZ,1,.2,.45)+.1:.15);plot(X,Y,Z+.05,RAMP[l],9*NL+l)}}
+ for(const sg of[-1,1]){
+  for(let u=0;u<6.28;u+=.05)for(const k of[.8,.9,1]){const ca=cos(u)*1.6*k,sb=sin(u)*.9*k,ro=.5;
+   tf(sg*(1.7+ca*cos(ro)-sb*sin(ro)),-9.3+ca*sin(ro)+sb*cos(ro),4.9);cn(sg*cos(u)*.4,sin(u)*.5,1);
+   const l=lv(shade(NX,NY,NZ,.8+.2*k,.3,.5));plot(X,Y,Z+.1,RAMP[l],9*NL+l)}
+  for(let t=0;t<=1;t+=.02){tf(sg*(.4+1.3*t),-9.6-3.4*t,4.8);plot(X,Y,Z+.1,'%',9*NL+7)}}
+ for(let a=0;a<6.28;a+=.4){tf(cos(a)*.45,-9.3+sin(a)*.45,5.1);plot(X,Y,Z+.2,'@',9*NL+10)}}
+function post(){const N=[-1,1,-W,W,-W-1,-W+1,W-1,W+1];
+ for(let r=1;r<H-1;r++)for(let c=1;c<W-1;c++){const i=r*W+c;if(chs[i]===' ')continue;const z=zb[i];let occ=0;
+  for(const k of N){const d=zb[i+k]-z-.8;if(d>0)occ+=Math.min(1,d/3)}
+  const ty=(cols[i]/NL)|0,fog=Math.max(0,Math.min(1,(z+9)/18)),l=Math.max(0,(cols[i]%NL)-Math.round(occ*.7+(1-fog)*2.5));
+  cols[i]=ty*NL+l;if(ty!=7&&ty!=5&&ty!=10)chs[i]=RAMP[l]}}
+const NP=40,U=new Float64Array(NP),V=new Float64Array(NP),AC=new Float64Array(NP);
+let OM=0,OA=0,pA=0,wxl=0,wzl=0,tw=0;
+const dsp=t=>{const u=((t%(2*PI))+2*PI)%(2*PI)/(2*PI)*NP,i=Math.floor(u),f=u-i;return U[i%NP]*(1-f)+U[(i+1)%NP]*f};
+const ddsp=t=>{const u=((t%(2*PI))+2*PI)%(2*PI)/(2*PI)*NP,i=Math.floor(u);return(U[(i+1)%NP]-U[i%NP])*NP/(2*PI)};
+// physics: spring-damped flower heads, wind gusts, rotation inertia, and a ring of coupled paper-rim nodes
+function phys(dt){const tA=A+DA,w=Math.max(-8,Math.min(8,(tA-pA)/dt));pA=tA;const pw=OM;OM+=(w-OM)*Math.min(1,dt*8);
+ OA+=(Math.max(-60,Math.min(60,(OM-pw)/dt))-OA)*Math.min(1,dt*6);
+ const g=idle*(.5+1.6*Math.pow(Math.max(0,sin(tt*.45)),2)*Math.max(0,sin(tt*.8+1))),cA=cos(tA),sA=sin(tA);
+ wxl=g*(cA-.35*sA);wzl=g*(sA+.35*cA);
+ tw+=(Math.max(-.5,Math.min(.5,-OM*.07))-tw)*Math.min(1,dt*8);
+ const h=dt/2;
+ for(let n=0;n<2;n++){
+  for(const f of FL){const px=f.p[0],pz=f.p[2],k=22+12/f.s;
+   const F=[-OA*.35*pz+OM*OM*.6*px+wxl*4.5,0,OA*.35*px+OM*OM*.6*pz+wzl*4.5];
+   for(let a=0;a<3;a++){f.sv[a]+=(F[a]-k*f.sp[a]-3.2*f.sv[a])*h;f.sp[a]=Math.max(-1.2,Math.min(1.2,f.sp[a]+f.sv[a]*h))}}
+  for(let k=0;k<NP;k++){const th=k*2*PI/NP,l=U[(k+NP-1)%NP],r=U[(k+1)%NP];
+   AC[k]=60*(l+r-2*U[k])-14*U[k]-2.6*V[k]+(wxl*cos(th)+wzl*sin(th))*1.2+sin(tt*2.7+k*1.9)*.1*(.25*idle+Math.min(1,abs(OM)*.4))}
+  for(let k=0;k<NP;k++){V[k]+=AC[k]*h;U[k]=Math.max(-.3,Math.min(.3,U[k]+V[k]*h))}}}
+function render(){
+ zb.fill(-1e9);chs.fill(' ');cols.fill(255);
+ K=nrm([-.45+.15*sin(tt*.6)*idle,.6,.65]);HV=nrm([K[0],K[1],K[2]+1]);
+ setCam(A+DA,sin(tt*.9)*.04*idle,.3+.1*sin(A*.5)+sin(tt*.5)*.02*idle+DP);
+ wrap();LV.forEach(leaf);SP.forEach(sprig);
+ FL.forEach((f,i)=>{
+  const bb=Math.max(0,Math.min(1,B*1.6-f.d*.6)),b0=bb*bb*(3-2*bb),b=Math.min(1,b0*(1+.035*idle*sin(tt*1.3+i)));
+  const hx=f.p[0]+f.sp[0]+idle*.1*sin(tt*1.1+i*1.7),hy=f.p[1]+f.sp[1]+idle*.08*sin(tt*1.4+i*2.3),hz=f.p[2]+f.sp[2]+idle*.1*cos(tt*.9+i);
+  const d=[f.d0[0]+idle*.04*sin(tt+i)+f.sp[0]*.22,f.d0[1],f.d0[2]+idle*.04*cos(tt*.8+i*1.6)+f.sp[2]*.22],dn=Math.hypot(...d),dd=d.map(q=>q/dn);
+  const C=mul(M,orient(dd,f.tw)),o=[M[0]*hx+M[1]*hy+M[2]*hz+T[0],M[3]*hx+M[4]*hy+M[5]*hz+T[1],M[6]*hx+M[7]*hy+M[8]*hz+T[2]];
+  const E=[f.p[0]*.22,-6.4,f.p[2]*.22],len=Math.hypot(hx-E[0],hy-E[1],hz-E[2]);
+  stem([hx,hy,hz],E,[hx-dd[0]*len*.35,hy-dd[1]*len*.35,hz-dd[2]*len*.35],2);
+  (f.k=='p'?peony:f.k=='l'?lily:blossom)(C,o,f,b)});
+ post();for(const[c,r,p]of SK){const k=r*W+c;if(chs[k]===' '){const v=sin(tt*1.6+p);if(v>.55){chs[k]=v>.9?'*':'.';cols[k]=10*NL+3+Math.floor(v*4)}}}
+ if(B>.9)for(let i=0;i<10;i++){const c=Math.floor((((i*7.7+sin(tt*.5+i*2)*4)%W)+W)%W),r=Math.floor((tt*1.6+i*5.3)%H),k=r*W+c;if(chs[k]===' '){chs[k]=',~'[i%2];cols[k]=8}}
+ let h='';
+ for(let r=0;r<H;r++){let run='',cur=-2;
+  const flush=()=>{if(run)h+=cur<0?run:`<span style="color:${pal[(cur/NL)|0][cur%NL]}">${run}</span>`;run=''};
+  for(let c=0;c<W;c++){const i=r*W+c,col=chs[i]===' '?-1:cols[i];if(col!==cur){flush();cur=col}run+=chs[i]}
+  flush();h+='\n'}
+ art.innerHTML=h}
+const art=document.getElementById('art');
+function fit(){art.style.fontSize=Math.max(4,Math.min(20,(document.getElementById('stage').clientWidth-8)/(W*.602),(innerHeight-56)/(H*1.2)))+'px'}
+addEventListener('resize',fit);fit();
+if(matchMedia('(prefers-reduced-motion:reduce)').matches){rot=false;idleOn=false;anim=false;B=1}
+function tick(ms){requestAnimationFrame(tick);if(ms-lastR<40)return;const dt=Math.min(.08,(ms-last)/1000);last=ms;lastR=ms;
+ if(anim){cyc+=dt;B=cyc<5?cyc/5:cyc<13?1:Math.max(0,1-(cyc-13)/2.5);if(cyc>=15.5)cyc=0}
+ tt+=dt;idle+=((idleOn?1:0)-idle)*Math.min(1,dt*3);if(rot&&!drag)A+=dt*.55;phys(dt);render()}
+requestAnimationFrame(tick);
+const st=document.getElementById('stage');let px0,py0;
+st.addEventListener('pointerdown',e=>{drag=true;px0=e.clientX;py0=e.clientY;st.setPointerCapture(e.pointerId)});
+st.addEventListener('pointermove',e=>{if(!drag)return;DA+=(e.clientX-px0)*.012;DP=Math.max(-.5,Math.min(.6,DP+(e.clientY-py0)*.006));px0=e.clientX;py0=e.clientY});
+st.addEventListener('pointerup',()=>drag=false);st.addEventListener('pointercancel',()=>drag=false);
+</script></body></html>
